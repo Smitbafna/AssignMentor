@@ -5,7 +5,16 @@
     <title>Orgselect</title>
 </head>
 <body>
-    <h2>Welcome to the Orgselect, {{ request.user.username }}!</h2>
+    <h2>Welcome to Orgselect, {{ request.user.username }}!</h2>
     <p>This is your secure Orgselect page.</p>
+    
+    <h3>List of Organizations:</h3>
+    <ul>
+        {% for organization in organizations %}
+            <li>{{ organization.name }}</li>
+        {% empty %}
+            <li>No organizations found.</li>
+        {% endfor %}
+    </ul>
 </body>
 </html>
