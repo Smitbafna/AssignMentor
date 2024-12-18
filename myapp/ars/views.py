@@ -27,25 +27,134 @@ from .models import CustomUser
 from django.contrib.auth import authenticate, login as auth_login
 from django.http import FileResponse, Http404
 import os;
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import permission_classes
+from rest_framework.views import APIView
+
 
 @api_view(['GET'])
-def getOrgsOfUser(request, email):
-    user = get_object_or_404(CustomUser, email=email) 
-    org_memberships = OrgMember.objects.filter(user=user) 
+@permission_classes([IsAuthenticated])  # This ensures the request is authenticated
+def getOrgsOfUser(request):
+    # Get the Authorization header from the request
+    auth_header = request.headers.get('Authorization')
+    
+    if not auth_header:
+        return JsonResponse({'error': 'Authorization token missing'}, status=401)
+
+    # Extract the token from the 'Bearer' part of the header
+    token = auth_header.split(' ')[-1]  # Gets the token part after 'Bearer'
+    
+    if not token:
+        return JsonResponse({'error': 'Invalid token format'}, status=401)
+
+    try:
+        # Validate and decode the token
+        payload = JWTAuthentication().get_validated_token(token)
+        
+        # Extract the user ID from the token's payload
+        user_id_from_token = payload.get('user_id')
+        
+        # Fetch the user object based on the ID from the token
+        user = get_object_or_404(CustomUser, id=user_id_from_token)
+    
+    except AuthenticationFailed:
+        return JsonResponse({'error': 'Invalid or expired token'}, status=401)
+
+    # Fetch organizations the user is part of
+    org_memberships = OrgMember.objects.filter(user=user)
+    
     organizations = []
-    for membership in org_memberships:
-        org = membership.org_id_FK  
+    for org in org_memberships:
         organizations.append({
             'id': org.org_id,
-            'name': org.org_name, 
+            'name': org.org_name
         })
 
+    # Return the organizations associated with the authenticated user
     return JsonResponse({'organizations': organizations})
-
 
 
 def index(request):
     return render(request, 'users/index.html')
+
+
+@api_view(['POST'])
+def create_assignment(request):
+    if request.method == 'POST':
+        serializer = AssignmentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+def get_assignment(request, pk):
+    try:
+        assignment = Assignment.objects.get(pk=pk)
+        serializer = AssignmentSerializer(assignment)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Assignment.DoesNotExist:
+        return Response({'detail': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['DELETE'])
+def delete_assignment(request, pk):
+    try:
+        assignment = Assignment.objects.get(pk=pk)
+        assignment.delete()
+        return Response({'detail': 'Assignment deleted'}, status=status.HTTP_204_NO_CONTENT)
+    except Assignment.DoesNotExist:
+        return Response({'detail': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['PUT'])
+def update_assignment(request, pk):
+    try:
+        assignment = Assignment.objects.get(pk=pk)
+    except Assignment.DoesNotExist:
+        return Response({'detail': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Create or update the serializer with the request data
+    serializer = AssignmentSerializer(assignment, data=request.data, partial=False)  # `partial=False` ensures all fields are required
+    
+    if serializer.is_valid():
+        # Save the updated assignment
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def submit_assignment(request):
+    # Validate required fields in request data
+    subtask_id = request.data.get('subtask_id_FK')
+    team_leader_id = request.data.get('team_leader_id_FK')
+    reviewer_id = request.data.get('reviewer_id_FK')
+    submission_status = request.data.get('submission_status', 'S')  # Default to 'S' for Submitted
+
+    # Check if all required fields are provided
+    if not all([subtask_id, team_leader_id, reviewer_id]):
+        return Response({'detail': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create a new Submission
+    try:
+        submission = Submission.objects.create(
+            subtask_id=subtask_id,
+            team_leader_id=team_leader_id,
+            reviewer_id=reviewer_id,
+            submission_status=submission_status,
+        )
+
+        # Serialize the created Submission object
+        serializer = SubmissionSerializer(submission)
+
+        # Return the serialized data
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 
 
 def login(request):
