@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+from corsheaders.defaults import default_headers
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -147,8 +149,8 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 CHANNELI_CLIENT_ID = 'sAHyTJUA1sgB0Ail9txgi71kYTe6R2IVtvX3qC6Z'
 CHANNELI_CLIENT_SECRET = 'm3y54IQ0dkFaMOfRtj4J3h4y0kKZ4w0UJRNDfs3W24xGJIhuD8Vq2oqkhI0Jn2i207mL8LkpFArfkWauIISn3DFxLGvojpjrq0OqRTIegEBis4h84qQZBVMR1fULroqG'
@@ -161,3 +163,13 @@ LOGIN_URL = '/users/login/'
 LOGIN_REDIRECT_URL = '/users/Orgselect/'  # Redirect here after login
 
 CORS_ALLOW_ALL_ORIGINS = True 
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+]
+
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'assignment_id',
+    'assignment_name',
+]

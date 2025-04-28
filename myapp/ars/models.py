@@ -74,22 +74,32 @@ class CustomUser(AbstractUser):
 
 class Assignment(models.Model):
     assignment_id = models.AutoField(primary_key=True)
-    is_assign_creator_FK = models.ForeignKey(
-        'ars.OrgMember', 
-        on_delete=models.CASCADE,
-        related_name="assignments_created_by_member"
-    )
-    assignment_name = models.CharField(
-        max_length=255
-    )
+    # is_assign_creator_FK = models.ForeignKey(
+    #     'ars.OrgMember', 
+    #     on_delete=models.CASCADE,
+    #     related_name="assignments_created_by_member"
+    # )
+    assignment_name = models.CharField(max_length=255)
     start_date = models.DateField(auto_now_add=True)
     end_date = models.DateField()
     assignment_description = models.TextField()
-    assigned_teams_FK = models.ManyToManyField('ars.Team')
+
+    # Nullable assigned_teams_FK (can be empty)
+    assigned_teams_FK = models.ManyToManyField('ars.Team', blank=True)
+
+    # Nullable assign_reviewer_FK (can be empty)
     assign_reviewer_FK = models.ManyToManyField(
         'ars.OrgMember', 
-        blank=True,
+        blank=True,  # Allows empty
         related_name="assignments_reviewed_by_member"
+    )
+
+    # Nullable assignment tasks (subtasks) (can be empty)
+    # If you wish to have tasks/subtasks related to assignments, you can either add these fields here or keep them in a separate model.
+    assignment_tasks = models.ManyToManyField(
+        'ars.AssignmentSubtask', 
+        blank=True,
+        related_name='assigned_to_assignments'
     )
 
     def __str__(self):
@@ -100,19 +110,33 @@ class AssignmentSubtask(models.Model):
     ass_to_subtask_FK = models.ForeignKey(Assignment, on_delete=models.CASCADE)
     description = models.TextField()
     subtask_end_date = models.DateField()
-    assign_subtask_status_FK = models.OneToOneField('Submission', on_delete=models.CASCADE)
+    
+    # Nullable submission reference (can be empty)
+    assign_subtask_status_FK = models.OneToOneField(
+        'Submission',
+        null=True,
+        on_delete=models.CASCADE
+    )
+
     subtask_status = models.BooleanField(default=False)
-    assign_subtask_reviewer_FK = models.ManyToManyField(CustomUser)
+    
+    # Nullable reviewer assignment (can be empty)
+    assign_subtask_reviewer_FK = models.ManyToManyField(
+        'ars.CustomUser',
+        blank=True,  # Allows empty
+        related_name="reviewed_subtasks"
+    )
 
     def __str__(self):
         return f"Subtask {self.subtask_id} of Assignment {self.ass_to_subtask_FK.assignment_name}"
 
+
 class Submission(models.Model):
     submission_id = models.AutoField(primary_key=True)
-    subtask_id_FK = models.ForeignKey(AssignmentSubtask, on_delete=models.CASCADE)
+    subtask_id_FK = models.ForeignKey(AssignmentSubtask, on_delete=models.CASCADE, null=True, blank=True)  # Made optional
     isCompleted = models.BooleanField(default=False)
     reviewer_id_FK = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    team_leader_id_FK = models.ForeignKey('ars.Team', on_delete=models.CASCADE)
+    team_leader_id_FK = models.ForeignKey('ars.Team', on_delete=models.CASCADE, null=True, blank=True)  # Made optional
     
     submitted_at = models.DateTimeField(auto_now_add=True)
 
@@ -136,6 +160,7 @@ class Submission(models.Model):
     def __str__(self):
         return f'Submission {self.submission_id} for Subtask {self.subtask_id_FK}'
 
+
 class Attachment(models.Model):
     attachment_id = models.AutoField(primary_key=True)
     attachment_type = models.CharField(max_length=50, choices=[
@@ -148,6 +173,9 @@ class Attachment(models.Model):
     iteration = models.PositiveIntegerField(default=1, editable=False)
     date_of_submission = models.DateField(auto_now_add=True)
     submission_id_FK = models.ForeignKey(Submission, on_delete=models.CASCADE)
+    
+    # Adding the FileField here to store the file as part of the attachment
+    attachment_file = models.FileField(upload_to='uploads', null=True, blank=True)
 
     def save(self, *args, **kwargs):
         # Automatically set the iteration number based on the number of previous attachments for the same submission
@@ -207,7 +235,7 @@ class Team(models.Model):
     team_name = models.CharField(max_length=255)
     team_members_FK = models.ManyToManyField(OrgMember, related_name="teams_with_member")
     team_leader_FK = models.ForeignKey(OrgMember, on_delete=models.CASCADE, related_name="teams_led_by_member")
-    team_leader_submission_FK = models.ForeignKey(Submission, on_delete=models.CASCADE)
+    team_leader_submission_FK = models.ForeignKey(Submission,null=True, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.team_name

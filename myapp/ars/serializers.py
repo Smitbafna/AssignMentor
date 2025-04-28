@@ -7,8 +7,7 @@ from rest_framework import serializers
 class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
-        fields = '__all__'  # Serialize all fields
-
+        fields = '__all__'  # Include all fields except is_assign_creator_FK
 
 class AssignmentSubtaskSerializer(serializers.ModelSerializer):
     class Meta:
@@ -64,4 +63,3 @@ class TeamSerializer(serializers.ModelSerializer):
         model = Team
         fields = '__all__'  # Serialize all fields
 
-        
